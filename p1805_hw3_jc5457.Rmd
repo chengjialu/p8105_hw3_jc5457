@@ -1,0 +1,13 @@
+---
+title: "p1805_hw3_jc5457"
+output: github_document
+---
+
+```{r, echo = FALSE, message=FALSE}
+library(tidyverse)
+library(ggridges)
+library(readxl)
+library(dplyr)
+```
+
+# Problem 1
