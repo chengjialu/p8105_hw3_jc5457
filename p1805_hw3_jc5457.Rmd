@@ -3,130 +3,137 @@ title: "p1805_hw3_jc5457"
 output: github_document
 ---
 
-```{r, echo = FALSE, message=FALSE}
+```{r setup, include=FALSE}
 library(tidyverse)
+library(ggridges)
+library(patchwork)
+
 library(p8105.datasets)
+
+knitr::opts_chunk$set(
+	echo = TRUE,
+	warning = FALSE,
+	fig.width = 8, 
+  fig.height = 6,
+  out.width = "90%"
+)
+
+theme_set(theme_minimal() + theme(legend.position = "bottom"))
+
+options(
+  ggplot2.continuous.colour = "viridis",
+  ggplot2.continuous.fill = "viridis"
+)
+
+scale_colour_discrete = scale_colour_viridis_d
+scale_fill_discrete = scale_fill_viridis_d
 ```
 
-# Problem 1
-Explore the `instacart` dataset
+### Problem 1
+
+#### Read in the data
+
 ```{r}
 data("instacart")
+
+instacart = 
+  instacart %>% 
+  as_tibble(instacart)
 ```
 
-**Describe the dataset**
+#### Answer questions about the data
 
-The "instacart" dataset has `r ncol(instacart)` columns(variables) and `r nrow(instacart)` rows. 
+This dataset contains `r nrow(instacart)` rows and `r ncol(instacart)` columns, with each row resprenting a single product from an instacart order. Variables include identifiers for user, order, and product; the order in which each product was added to the cart. There are several order-level variables, describing the day and time of the order, and number of days since prior order. Then there are several item-specific variables, describing the product name (e.g. Yogurt, Avocado), department (e.g. dairy and eggs, produce), and aisle (e.g. yogurt, fresh fruits), and whether the item has been ordered by this user in the past. In total, there are `r instacart %>% select(product_id) %>% distinct %>% count` products found in `r instacart %>% select(user_id, order_id) %>% distinct %>% count` orders from `r instacart %>% select(user_id) %>% distinct %>% count` distinct users.
 
-The meaning of some of the key variables are listed below: 
-(source: https://www.p8105.com/dataset_instacart.html)
-
-* `order_id`: order identifier
-* `product_id`: product identifier
-* `add_to_cart_order`: order in which each product was added to cart
-* `reordered`: 1 if this prodcut has been ordered by this user in the past, 0 otherwise
-* `user_id`: customer identifier
-* `eval_set`: which evaluation set this order belongs in (Note that the data for use in this class is exclusively from the “train” eval_set)
-* `order_number`: the order sequence number for this user (1=first, n=nth)
-* `order_dow`: the day of the week on which the order was placed
-* `order_hour_of_day`: the hour of the day on which the order was placed
-* `days_since_prior_order`: days since the last order, capped at 30, NA if order_number=1
-* `product_name`: name of the product
-* `aisle_id`: aisle identifier
-* `department_id`: department identifier
-* `aisle`: the name of the aisle
-* `department`: the name of the department
-
-The variables `eval_set`, `product_name`, `aisle`, and `department` are all characters. All other variables are intergers. 
-
-The distribution summary of the variables of `add_to_cart_order`,`order_number`, `order_dow`, `order_hour_of_day`, `days_since_prior_order` are shown below:
+Below is a table summarizing the number of items ordered from aisle. In total, there are 134 aisles, with fresh vegetables and fresh fruits holding the most items ordered by far.
 
 ```{r}
-summary(instacart[c(3,7,8,9,10)])
+instacart %>% 
+  count(aisle) %>% 
+  arrange(desc(n))
 ```
 
-**Count asiles and find most ordered aisles**
+Next is a plot that shows the number of items ordered in each aisle. Here, aisles are ordered by ascending number of items.
+
+```{r}
+instacart %>% 
+  count(aisle) %>% 
+  filter(n > 10000) %>% 
+  mutate(aisle = fct_reorder(aisle, n)) %>% 
+  ggplot(aes(x = aisle, y = n)) + 
+  geom_point() + 
+  labs(title = "Number of items ordered in each aisle") +
+  theme(axis.text.x = element_text(angle = 60, hjust = 1))
+
+```
+
+Our next table shows the three most popular items in aisles `baking ingredients`, `dog food care`, and `packaged vegetables fruits`, and includes the number of times each item is ordered in your table.
+
+```{r}
+instacart %>% 
+  filter(aisle %in% c("baking ingredients", "dog food care", "packaged vegetables fruits")) %>%
+  group_by(aisle) %>% 
+  count(product_name) %>% 
+  mutate(rank = min_rank(desc(n))) %>% 
+  filter(rank < 4) %>% 
+  arrange(desc(n)) %>%
+  knitr::kable()
+```
+
+Finally is a table showing the mean hour of the day at which Pink Lady Apples and Coffee Ice Cream are ordered on each day of the week. This table has been formatted in an untidy manner for human readers. Pink Lady Apples are generally purchased slightly earlier in the day than Coffee Ice Cream, with the exception of day 5.
 
 ```{r}
 instacart %>%
-  count(aisle, name = "n_obs") %>% 
-  arrange(desc(n_obs)) 
+  filter(product_name %in% c("Pink Lady Apples", "Coffee Ice Cream")) %>%
+  group_by(product_name, order_dow) %>%
+  summarize(mean_hour = mean(order_hour_of_day)) %>%
+  spread(key = order_dow, value = mean_hour) %>%
+  knitr::kable(digits = 2)
 ```
 
-As shown in the counting table above, there are 134 aisles. Fresh vegetables is the aisles that most items ordered from.
 
-**Plot of number of items ordered in each aisle**
 
+### Problem 2
+#### Load and clean the data
 ```{r}
-instacart %>%
-  count(aisle, name = "n_obs") %>% 
-  filter(n_obs > 10000) %>% 
-  ggplot(aes(x = aisle, y = n_obs))+
-  geom_point() +
-  coord_flip() +
-  ggtitle("") +
-  xlab("aisle name") + ylab("number of items")
+accel_df =
+  read_csv("data/accel_data.csv") %>% 
+  janitor::clean_names() %>% 
+  mutate(day = factor(day))
 ```
 
-**Make table showing the three most popular items in each of the aisles “baking ingredients”, “dog food care”, and “packaged vegetables fruits”**
+#### Describe the resulting dataset
+There are 35 observations and 1443 variables in this dataset. 
+The variables are `week`, `day_id`, `day`, and 1440 activity variables `activity_1`, `activity_2`... `activity_1440`. 
 
+#### Traditional analyses of accelerometer data focus on the total activity over the day.
+Here we use the tidied dataset, aggregate across minutes to create a total activity variable for each day, and create a table showing these totals. 
 ```{r}
-baking_ingredients = 
-  instacart %>%
-  filter(aisle == "baking ingredients") %>% 
-  group_by(aisle, product_name) %>%
-  summarize(n_obs = n()) %>% 
-  arrange(desc(n_obs)) 
-
-dog_food_care = 
-  instacart %>%
-  filter(aisle == "dog food care") %>% 
-  group_by(aisle, product_name) %>%
-  summarize(n_obs = n()) %>% 
-  arrange(desc(n_obs)) 
-
-packaged_vegetables_fruits = 
-  instacart %>%
-  filter(aisle == "packaged vegetables fruits") %>% 
-  group_by(aisle, product_name) %>%
-  summarize(n_obs = n()) %>% 
-  arrange(desc(n_obs)) 
-
-three_most_popular = 
-  bind_rows(baking_ingredients[c(1,2,3),],
-            dog_food_care[c(1,2,3),],
-            packaged_vegetables_fruits[c(1,2,3),])
-
-three_most_popular
+accel_df %>% 
+  mutate(total_activity = sum(accel_df[4:1443])) %>% 
+  subset(select = c("week","day_id","day","total_activity" )) %>% 
+  knitr::kable(digits = 2)
 ```
 
-**Table showing the mean hour of the day at which Pink Lady Apples and Coffee Ice Cream are ordered**
+Trend: The total activity in each day through five weeks are all the same.
 
+#### Making plot
+Accelerometer data allows the inspection activity over the course of the day. Here we make a single-panel plot that shows the 24-hour activity time courses for each day and use color to indicate day of the week. 
 ```{r}
-Pink_Lady_Apples = 
-  instacart %>% 
-  filter(product_name == "Pink Lady Apples") %>% 
-  group_by(order_dow) %>% 
-  summarize(mean_hour_of_the_day = mean(order_hour_of_day))
-
-Coffee_Ice_Cream = 
-  instacart %>% 
-  filter(product_name == "Coffee Ice Cream") %>% 
-  group_by(order_dow) %>% 
-  summarize(mean_hour_of_the_day = mean(order_hour_of_day))
-
-meanhour_table = 
-  merge(x = Pink_Lady_Apples, 
-        y = Coffee_Ice_Cream, 
-        by = "order_dow") %>%  
-  rename(Pink_Lady_Apples_mean_hour = mean_hour_of_the_day.x, 
-         Coffee_Ice_Cream_mean_hour = mean_hour_of_the_day.y) %>% 
-  mutate(mean_hour = 
-         ((Pink_Lady_Apples_mean_hour 
-           + Coffee_Ice_Cream_mean_hour)/2) ) %>% 
-  select(order_dow, mean_hour)
-
-meanhour_table
+accel_df %>%
+  pivot_longer(
+    activity_1:activity_1440, 
+    names_to = "activity", 
+    values_to = "activity_count_per_minute") %>%
+  mutate(activity = factor(activity)
+         ) %>% 
+  ggplot(aes(x = day_id, 
+             y = activity_count_per_minute, 
+             colour = day_id)) +
+  geom_point()
 ```
+
+The graph shows that this person mainly had their activity count per minute below 2500.
+
 
 
